@@ -81,3 +81,4 @@ def favicon():
     """Favicon endpoint"""
     return FileResponse("app/public/images/favicon.ico")
 
+# hello world
