@@ -1,24 +1,25 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-
 from app.core.config import settings
 
-# Create a standard synchronous engine with psycopg2
+# Create async engine
 engine = create_async_engine(
-    settings.SQLALCHEMY_DATABASE_URI,
-    pool_pre_ping=True,
-    echo=False,
+    settings.DATABASE_URL,
+    echo=True,
+    future=True
 )
 
-# Create asynchronous session factory
+# Create async session factory
 AsyncSessionLocal = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
     autocommit=False,
     autoflush=False,
-    bind=engine,
-    class_=AsyncSession
 )
 
-async def get_db():
+async def get_db() -> AsyncSession:
+    """Dependency to get database session"""
     async with AsyncSessionLocal() as session:
         try:
             yield session

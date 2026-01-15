@@ -1,251 +1,483 @@
-# FastAPI Project
+# FastAPI RBAC/ABAC/ReBAC Implementation Guide
 
-A scalable FastAPI project template with SQLAlchemy, PostgreSQL, and best practices for building robust APIs.
+Complete implementation of Role-Based Access Control (RBAC), Attribute-Based Access Control (ABAC), and Relationship-Based Access Control (ReBAC) using Casbin, PostgreSQL, and Docker.
 
-## Features
+## 🎯 Features
 
-- **FastAPI framework** with all its features
-- **Async SQLAlchemy** with PostgreSQL
-- **Repository pattern** for data access
-- **Service layer** for business logic
-- **Pydantic models** for validation
-- **Modular project structure** following best practices
-- **Dependency injection** for clean code organization
-- **Custom exception handling** for consistent error responses
-- **Docker support** for easy development and deployment
-- **Automatic API documentation** with Swagger/OpenAPI
-- **Comprehensive test suite** with pytest
-- **Authentication** with JWT tokens
+- **RBAC (Role-Based Access Control)**: Users are assigned roles, and roles have permissions
+- **ABAC (Attribute-Based Access Control)**: Access control based on user attributes (department, level, location)
+- **ReBAC (Relationship-Based Access Control)**: Access control based on resource relationships
+- **Casbin Integration**: Powerful authorization library supporting all three models
+- **PostgreSQL**: Reliable database for storing policies and user data
+- **Docker**: Containerized deployment for easy setup
+- **Redis**: Caching and session management
+- **JWT Authentication**: Secure token-based authentication
+- **FastAPI**: Modern, fast Python web framework
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 .
-├── alembic/                # Database migrations
-├── app/                    # Application code
-│   ├── api/                # API routes
-│   │   └── v1/             # API version 1
-│   │       ├── endpoints/  # API endpoints
-│   │       └── api.py      # API router
-│   ├── core/               # Core configuration
-│   ├── db/                 # Database models and session
-│   ├── dependencies/       # Dependency injection
-│   ├── exceptions/         # Custom exceptions
-│   ├── middlewares/        # Middleware functions
-│   ├── models/             # SQLAlchemy models
-│   ├── repositories/       # Data access layer
-│   ├── schemas/            # Pydantic schemas
-│   ├── services/           # Business logic
-│   ├── utils/              # Utility functions
-│   └── main.py             # FastAPI application
-├── docs/                   # Documentation
-├── tests/                  # Tests
-│   ├── integration/        # Integration tests
-│   └── unit/               # Unit tests
-├── .env.example            # Example environment variables
-├── .gitignore              # Git ignore file
-├── docker-compose.yml      # Docker Compose configuration
-├── Dockerfile              # Docker configuration
-├── main.py                 # Application entry point
-├── pytest.ini              # Pytest configuration
-├── README.md               # Project documentation
-├── requirements.txt        # Python dependencies
-└── setup.py                # Package setup
+├── app/
+│   ├── api/v1/endpoints/
+│   │   ├── auth.py           # Authentication endpoints
+│   │   └── rbac.py           # RBAC management endpoints
+│   ├── casbin/
+│   │   ├── rbac_model.conf   # RBAC model configuration
+│   │   ├── abac_model.conf   # ABAC model configuration
+│   │   ├── rebac_model.conf  # ReBAC model configuration
+│   │   └── rbac_policy.csv   # Initial RBAC policies
+│   ├── core/
+│   │   ├── config.py         # Application configuration
+│   │   ├── security.py       # Security utilities
+│   │   └── casbin_enforcer.py # Casbin enforcer setup
+│   ├── db/
+│   │   ├── base_class.py     # SQLAlchemy base
+│   │   └── session.py        # Database session
+│   ├── middlewares/
+│   │   └── auth_middleware.py # Authorization middleware
+│   ├── models/
+│   │   └── user.py           # User, Role, Permission models
+│   └── schemas/
+│       ├── auth.py           # Authentication schemas
+│       └── rbac.py           # RBAC schemas
+├── alembic/
+│   └── versions/
+│       └── 001_initial_migration.py
+├── docker-compose.yml
+├── Dockerfile
+├── main.py
+├── requirements.txt
+└── .env.example
 ```
 
-## Getting Started
+## 🚀 Quick Start
 
-### Prerequisites
-
-- Python 3.9+
-- PostgreSQL
-- Docker (optional)
-
-### Installation
-
-#### Local Development
-
-1. Clone the repository:
+### 1. Clone and Setup
 
 ```bash
+# Clone the repository
 git clone https://github.com/ascalingasin2022/fastapi-starter
-cd python-fastapi-starter-api-project
-```
+cd fastapi-starter
 
-2. Create and activate a virtual environment:
+# Run setup script
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 
-```bash
-py -m venv venv
-python3 -m venv venv # for Linux
-venv\Scripts\activate #venv\scripts\activate for windows
-source venv/bin/activate #for Linux
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-OR
-
-```bash
-py -m pip install -r requirements.txt
-```
-
-```bash
-#to update requirements.txt file =>
-py -m pip freeze > requirements.txt
-```
-
-4. Create a `.env` file based on `.env.example`:
-
-```bash
+# Copy environment file
 cp .env.example .env
 ```
 
-5. Start the application:
+### 2. Configure Environment
+
+Edit `.env` file with your settings:
+
+```env
+SECRET_KEY=your-super-secret-key-min-32-characters
+POSTGRES_PASSWORD=your-secure-password
+```
+
+### 3. Start Services with Docker
 
 ```bash
+# Build and start all services
+docker-compose up -d
+
+# Check services status
+docker-compose ps
+
+# View logs
+docker-compose logs -f app
+```
+
+### 4. Run Database Migrations
+
+```bash
+# Run migrations
+docker-compose exec app alembic upgrade head
+
+# Or manually create tables (the app does this on startup)
+```
+
+### 5. Access the Application
+
+- **API Documentation**: http://localhost:8000/api/v1/docs
+- **ReDoc**: http://localhost:8000/api/v1/redoc
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
+
+## 📚 Usage Guide
+
+### Authentication
+
+#### 1. Register a User
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "username": "admin",
+    "password": "StrongPassword123!",
+    "full_name": "Admin User",
+    "department": "IT",
+    "level": 5,
+    "location": "HQ"
+  }'
+```
+
+#### 2. Login
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=StrongPassword123!"
+```
+
+Response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
+}
+```
+
+### RBAC Operations
+
+#### Assign Role to User
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/rbac/roles/assign" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "role": "admin"
+  }'
+```
+
+#### Get User Roles
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/rbac/roles/user/admin" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### Assign Permission to Role
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/rbac/permissions/assign" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "editor",
+    "resource": "/api/v1/documents",
+    "action": "POST"
+  }'
+```
+
+#### Check Permission
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/rbac/check-permission" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "resource": "/api/v1/users",
+    "action": "GET"
+  }'
+```
+
+## 🔐 Access Control Models
+
+### RBAC (Role-Based Access Control)
+
+Users are assigned roles, and permissions are granted to roles.
+
+**Example Flow:**
+1. Create role: `admin`
+2. Assign permissions to role: `admin` can `GET`, `POST`, `PUT`, `DELETE` on `/api/v1/users`
+3. Assign role to user: User `alice` gets role `admin`
+4. User `alice` now has all admin permissions
+
+**Model Configuration** (`rbac_model.conf`):
+```ini
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[role_definition]
+g = _, _
+
+[matchers]
+m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
+```
+
+### ABAC (Attribute-Based Access Control)
+
+Access is granted based on user attributes like department, level, or location.
+
+**Example Rules:**
+- Users with `level >= 3` can access sensitive documents
+- Users in `department == "Finance"` can access financial reports
+- Users at `location == "HQ"` can approve requests
+
+**Model Configuration** (`abac_model.conf`):
+```ini
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub_rule, obj, act
+
+[matchers]
+m = eval(p.sub_rule) && r.obj == p.obj && r.act == p.act
+```
+
+### ReBAC (Relationship-Based Access Control)
+
+Access is based on relationships between users and resources.
+
+**Example Scenarios:**
+- Owner of a document can edit it
+- Members of a team can view team resources
+- Parent resources inherit permissions to child resources
+
+**Model Configuration** (`rebac_model.conf`):
+```ini
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[role_definition]
+g = _, _
+g2 = _, _
+
+[matchers]
+m = g(r.sub, p.sub) && g2(r.obj, p.obj) && r.act == p.act
+```
+
+## 🛠️ Development
+
+### Local Development (without Docker)
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start PostgreSQL and Redis locally
+# Update .env with local connection strings
+
+# Run migrations
+alembic upgrade head
+
+# Start the application
 python main.py
 ```
 
-OR
+### Adding New Endpoints with Authorization
 
-```bash
-py -m main
+```python
+from fastapi import APIRouter, Request
+from app.middlewares.auth_middleware import require_rbac_permission
+
+router = APIRouter()
+
+@router.get("/protected-resource")
+@require_rbac_permission("/api/v1/protected-resource", "GET")
+async def get_protected_resource(request: Request):
+    """Only users with proper RBAC permissions can access this"""
+    user = request.state.user
+    return {"message": f"Hello {user['sub']}"}
 ```
 
-#### Docker Development
+### Using Different Authorization Models
 
-1. Clone the repository:
+```python
+from app.middlewares.auth_middleware import (
+    require_rbac_permission,
+    require_abac_permission,
+    require_rebac_permission
+)
 
-```bash
-git clone https://github.com/kumarsonu676/python-fastapi-starter-api-project
-cd python-fastapi-starter-api-project
+# RBAC
+@require_rbac_permission("/api/v1/users", "GET")
+async def rbac_endpoint(request: Request):
+    pass
+
+# ABAC
+@require_abac_permission("/api/v1/sensitive", "GET")
+async def abac_endpoint(request: Request):
+    pass
+
+# ReBAC
+@require_rebac_permission("/api/v1/documents/123", "GET")
+async def rebac_endpoint(request: Request):
+    pass
 ```
 
-2. Create a `.env` file based on `.env.example`:
+## 🧪 Testing
+
+### Manual Testing with Swagger UI
+
+1. Go to http://localhost:8000/api/v1/docs
+2. Register a user via `/api/v1/auth/register`
+3. Login via `/api/v1/auth/login` to get token
+4. Click "Authorize" and enter: `Bearer YOUR_TOKEN`
+5. Test protected endpoints
+
+### Database Management
 
 ```bash
-cp .env.example .env
+# Access PostgreSQL
+docker-compose exec postgres psql -U postgres -d fastapi_db
+
+# List tables
+\dt
+
+# View Casbin rules
+SELECT * FROM casbin_rbac_rule;
+
+# View users
+SELECT * FROM users;
 ```
 
-3. Start the containers:
+### Redis Management
 
 ```bash
+# Access Redis CLI
+docker-compose exec redis redis-cli
+
+# List all keys
+KEYS *
+
+# Get value
+GET key_name
+```
+
+## 📊 Database Schema
+
+### Main Tables
+
+- `users`: User accounts with attributes for ABAC
+- `roles`: Role definitions
+- `permissions`: Role-permission mappings
+- `user_roles`: User-role associations
+- `resource_relationships`: Resource relationships for ReBAC
+- `casbin_rbac_rule`: RBAC policies
+- `casbin_abac_rule`: ABAC policies
+- `casbin_rebac_rule`: ReBAC policies
+
+## 🔧 Troubleshooting
+
+### Container Issues
+
+```bash
+# Restart all services
+docker-compose restart
+
+# Rebuild containers
+docker-compose down
+docker-compose up --build -d
+
+# View container logs
+docker-compose logs -f app
+docker-compose logs -f postgres
+```
+
+### Database Issues
+
+```bash
+# Reset database
+docker-compose down -v
 docker-compose up -d
+docker-compose exec app alembic upgrade head
 ```
 
-### Access the API
+### Permission Denied
 
-The API will be available at [http://localhost:8000](http://localhost:8000).
+If you get permission errors, make sure:
+1. User has proper role assigned
+2. Role has required permissions
+3. Token is valid and not expired
+4. Authorization header is correctly formatted
 
-API documentation is available at:
+## 📝 Best Practices
 
-- Swagger UI: [http://localhost:8000/api/v1/docs](http://localhost:8000/api/v1/docs)
-- ReDoc: [http://localhost:8000/api/v1/redoc](http://localhost:8000/api/v1/redoc)
+1. **Security**:
+   - Change `SECRET_KEY` in production
+   - Use strong passwords
+   - Enable HTTPS in production
+   - Rotate JWT tokens regularly
 
-## Development
+2. **RBAC**:
+   - Use meaningful role names
+   - Follow principle of least privilege
+   - Regularly audit role assignments
 
-### Adding a New Endpoint
+3. **ABAC**:
+   - Keep attribute rules simple
+   - Document attribute meanings
+   - Validate attribute values
 
-1. Create a new file in `app/api/v1/endpoints/`
-2. Create Pydantic models in `app/schemas/`
-3. Add SQLAlchemy models in `app/models/` if needed
-4. Implement business logic in `app/services/`
-5. Create repository in `app/repositories/` for data access
-6. Add the router to `app/api/v1/api.py`
+4. **ReBAC**:
+   - Model relationships carefully
+   - Consider inheritance hierarchies
+   - Test complex relationship chains
 
-### Database Migrations
-
-```bash
-# Initialize migrations (first time only)
-py -m alembic init alembic
-
-# Create a new migration
-py -m alembic revision --autogenerate -m "Migration message"
-
-# Run migrations
-py -m alembic upgrade head
-```
-
-# Generate SQL Script from migration/revision name
-
-```bash
-#  For the first migration— When it has no parent (Revises: is empty).
-py -m alembic upgrade base:<revision_name> --sql > migration_script.sql
-```
-
-```bash
-# If you want to generate a script that can be used to downgrade from the current revision to the base revision, you can use:
-py -m alembic downgrade base --sql > migration_script.sql
-```
-
-```bash
-# For the subsequent migration— When it has a parent (Revises: <revision_name>).
-# This will generate a script that can be used to upgrade from the previous revision to the current one.
-py -m alembic upgrade <from_rev>:<to_rev> --sql > migration_script.sql
-```
-
-```bash
-# If you want the SQL to downgrade from to_rev back to from_rev, just reverse the order:
-py -m alembic downgrade <to_rev>:<from_rev> --sql > migration_script.sql
-```
-
-```bash
-# To list all revisions and order:
-py -m alembic history --verbose
-```
-
-```bash
-# To show the current revision:
-py -m alembic current
-```
-
-```bash
-# To inspect details of a specific revision:
-py -m alembic show <revision_name>
-```
-
----
+## 🚢 Production Deployment
 
 ### Environment Variables
 
-Key environment variables for configuration:
+Set these in production:
+```env
+SECRET_KEY=<generate-strong-32+-char-key>
+POSTGRES_PASSWORD=<strong-database-password>
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db
+REDIS_URL=redis://host:6379/0
+```
 
-- `API_V1_STR`: API version prefix
-- `SECRET_KEY`: Secret key for JWT tokens
-- `POSTGRES_SERVER`: PostgreSQL server address
-- `POSTGRES_USER`: PostgreSQL username
-- `POSTGRES_PASSWORD`: PostgreSQL password
-- `POSTGRES_DB`: PostgreSQL database name
+### Docker Production Build
 
-## License
+```bash
+# Build optimized image
+docker build -t fastapi-rbac:prod .
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+# Run with production settings
+docker run -p 8000:8000 --env-file .env.prod fastapi-rbac:prod
+```
 
-## Acknowledgements
+## 📖 Additional Resources
 
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [SQLAlchemy](https://www.sqlalchemy.org/)
-- [Pydantic](https://pydantic-docs.helpmanual.io/)
-- [Alembic](https://alembic.sqlalchemy.org/)
+- [Casbin Documentation](https://casbin.org/docs/overview)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 
-2. Activate the virtual environment:
+## 🤝 Contributing
 
-   ```bash
-   # On Windows
-   venv\Scripts\activate
+Contributions are welcome! Please follow these steps:
 
-   # On Linux/Mac
-   source venv/bin/activate
-   ```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-3. Run the application:
+## 📄 License
 
-   ```bash
-   python main.py
-   ```
+This project is licensed under the MIT License.
 
-4. Access the API at http://localhost:8000
+## 🙏 Acknowledgments
+
+- FastAPI for the amazing framework
+- Casbin for the authorization library
+- PostgreSQL and Redis communities

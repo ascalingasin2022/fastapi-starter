@@ -1,84 +1,80 @@
-from fastapi import FastAPI
-import logging
+import uvicorn
 from contextlib import asynccontextmanager
-
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1.api import api_router
-from app.exceptions.handlers import add_exception_handlers
-from app.middlewares.setup import setup_middlewares
-from app.utils.docs import setup_swagger_documentation
-from app.utils.response import create_response
+from app.core.casbin_enforcer import casbin_enforcer
+from app.api.v1.endpoints import auth, rbac
+from app.db.session import engine
+from app.db.base_class import Base
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Lifespan context manager for the FastAPI application.
+    """Lifespan event handler for startup and shutdown"""
+    # Startup
+    print("🚀 Starting application...")
     
-    This context manager is used to manage the lifespan of the application,
-    including startup and shutdown events.
+    # Create database tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     
-    Args:
-        app: FastAPI application instance
-    """
-    # Perform startup tasks here
-    logger.info("Starting up the application...")
+    # Initialize Casbin enforcers
+    await casbin_enforcer.initialize()
+    
+    print("✅ Application started successfully!")
+    print(f"📚 API Documentation: http://localhost:8000{settings.API_V1_STR}/docs")
     
     yield
-    # Perform shutdown tasks here
-    logger.info("Shutting down the application...")
-    # Close database connections, etc.
+    
+    # Shutdown
+    await engine.dispose()
+    print("👋 Application shutdown complete")
 
-# Create FastAPI app
+
+# Create FastAPI app with lifespan
 app = FastAPI(
-    title="FastAPI Application",
-    description="FastAPI application with SQLAlchemy and PostgreSQL",
-    version="0.1.0",
+    title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=None,  # Disable default docs URL
-    redoc_url=None, # Disable default redoc URL
+    docs_url=f"{settings.API_V1_STR}/docs",
+    redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan
 )
 
-# Mount the "public" folder at "/static" path
-app.mount("/images", StaticFiles(directory="app/public/images"), name="images")
-app.mount("/css", StaticFiles(directory="app/public/css"), name="css")
-app.mount("/js", StaticFiles(directory="app/public/js"), name="js")
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Set up custom Swagger documentation
-setup_swagger_documentation(app, settings.API_V1_STR)
+# Include routers
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
+app.include_router(rbac.router, prefix=f"{settings.API_V1_STR}/rbac", tags=["RBAC Management"])
 
-# global error handler
-add_exception_handlers(app)
 
-# Set up middlewares
-setup_middlewares(app)
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "Welcome to FastAPI RBAC/ABAC/ReBAC API",
+        "docs": f"{settings.API_V1_STR}/docs",
+        "version": "1.0.0"
+    }
 
-# Include API router
-app.include_router(prefix=settings.API_V1_STR, router=api_router)
 
-# Root health check endpoint
-@app.get("/", tags=["health"])
-def root():
-    """Root endpoint for health checks"""
-    data = {"status": "ok", "message": "API is running"}
-    return create_response(
-        data=data,
-        message="API is running",
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
     )
-
-@app.get("/favicon.ico", include_in_schema=False)
-def favicon():
-    """Favicon endpoint"""
-    return FileResponse("app/public/images/favicon.ico")
-
-# hello world
