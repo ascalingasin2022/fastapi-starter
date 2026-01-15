@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, validator, ConfigDict
 
 from app.models.user import UserRole
 
@@ -60,7 +60,7 @@ class UserResponse(UserBase):
     """Schema for user response"""
     id: int
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    # Pydantic v2: allow constructing from ORM objects/attributes
+    model_config = ConfigDict(from_attributes=True)

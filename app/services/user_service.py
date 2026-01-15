@@ -1,6 +1,7 @@
 from typing import List, Optional, Union
 
 from app.core.security import get_password_hash
+from app.core.casbin_enforcer import casbin_enforcer
 from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.user import UserCreate, UserUpdate
@@ -16,16 +17,39 @@ class UserService:
     async def get(self, user_id: int) -> Optional[User]:
         """Get a user by ID"""
         result = await self.user_repo.get(user_id)
+        # attach casbin role if available
+        try:
+            roles = casbin_enforcer.get_roles_for_user(result.username) if result else []
+            if roles:
+                result._casbin_role = roles[0]
+        except Exception:
+            # enforcer may not be initialized yet; leave DB role/property as-is
+            pass
         return result
 
     async def get_by_email(self, email: str) -> Optional[User]:
         """Get a user by email"""
         result = await self.user_repo.get_by_email(email)
+        try:
+            roles = casbin_enforcer.get_roles_for_user(result.username) if result else []
+            if roles:
+                result._casbin_role = roles[0]
+        except Exception:
+            pass
         return result
 
     async def get_all_users(self) -> List[User]:
         """Get all users"""
         users, _ = await self.user_repo.get_multi()
+        # attach casbin roles where present
+        try:
+            for u in users:
+                roles = casbin_enforcer.get_roles_for_user(u.username)
+                if roles:
+                    u._casbin_role = roles[0]
+        except Exception:
+            # enforcer may not be initialized yet; ignore
+            pass
         return users
 
     async def create(self, obj_in: UserCreate) -> User:

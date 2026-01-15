@@ -27,12 +27,11 @@ def health_check(db: Session = Depends(get_db)):
     Returns:
         Success response with health status
     """
-    # Log this operation
     log_error("Health check performed")
     
     # Try to connect to the database
     try:
-        # Simple statement to test database connectivity using SQLAlchemy text()
+        # test database connectivity using SQLAlchemy text()
         result = db.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception as e:

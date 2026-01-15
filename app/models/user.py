@@ -44,6 +44,9 @@ class User(Base):
     @property
     def role(self) -> str:
         """Get primary role (first role or default to USER)"""
+        # Check for Casbin role first (set by UserService)
+        if hasattr(self, '_casbin_role'):
+            return self._casbin_role
         if self.roles:
             return self.roles[0].name
         return UserRole.USER.value
