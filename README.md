@@ -76,7 +76,9 @@ cd python-fastapi-starter-api-project
 
 ```bash
 py -m venv venv
+python3 -m venv venv # for Linux
 venv\Scripts\activate #venv\scripts\activate for windows
+source venv/bin/activate #for Linux
 ```
 
 3. Install dependencies:
