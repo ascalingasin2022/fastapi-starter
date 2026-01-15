@@ -1,66 +1,86 @@
 from typing import List, Optional
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import verify_token
 from app.core.config import settings
 from app.dependencies.services import get_user_service
 from app.exceptions.http_exceptions import BadRequestError, UnauthorizedError
-from app.schemas.user import UserResponse
+from app.schemas.auth import UserResponse
+from app.models.user import User
+from app.db.session import get_db
 from app.services.user_service import UserService
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),    
-    user_service: UserService = Depends(get_user_service)
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get the current authenticated user from the token.    
     
     Args:
         token: JWT access token
-        user_service: User service for database operations
+        db: Database session
 
     Returns:
-        Current authenticated user
+        Current authenticated user (User model)
         
     Raises:
-        UnauthorizedError: If authentication fails
+        HTTPException: If authentication fails
     """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
     payload = verify_token(token)
     if payload is None:
-        raise UnauthorizedError(
-            error_code="INVALID_CREDENTIALS",
-            detail="Could not validate credentials"
-        )
+        raise credentials_exception
 
-    user = await user_service.get_by_email(payload.get("email"))
-    if user is None:
-        raise UnauthorizedError(
-            error_code="INVALID_CREDENTIALS",
-            detail="Could not validate credentials"
+    # Try email first (from token payload)
+    email = payload.get("email")
+    username = payload.get("sub")  # username is typically in 'sub'
+    
+    user = None
+    if email:
+        result = await db.execute(
+            select(User).where(User.email == email)
         )
+        user = result.scalar_one_or_none()
+    
+    # If email lookup fails, try username
+    if user is None and username:
+        result = await db.execute(
+            select(User).where(User.username == username)
+        )
+        user = result.scalar_one_or_none()
+    
+    if user is None:
+        raise credentials_exception
     
     return user
 
 
-async def get_current_active_user(current_user: UserResponse = Depends(get_current_user)):
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
     """
     Get the current active user from the token.
     Args:
-        current_user: Current authenticated user
+        current_user: Current authenticated user (User model)
     Returns:
-        Current active user
+        Current active user (User model)
     Raises:
-        BadRequestError: If the user is inactive
+        HTTPException: If the user is inactive
     """
-    if current_user.is_active is False:
-        raise BadRequestError(
-            error_code="INACTIVE_USER",
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user"
         )
-   
     
     return current_user
 
@@ -93,12 +113,19 @@ def authorize(allowed_roles: Optional[List[str]] = None):
     Dependency for role-based access control.
     If no roles are provided, any authenticated active user is allowed.
     """
-    async def role_checker(current_user: UserResponse = Depends(get_current_active_user)):
+    async def role_checker(current_user: User = Depends(get_current_active_user)):
         if allowed_roles:
-            user_role = current_user.role
-            if user_role not in allowed_roles:
-                raise UnauthorizedError(
-                    error_code="ACCESS_FORBIDDEN",
+            # Get user's role - check if they have a role in the database
+            # For now, check if user has roles relationship
+            user_roles = [role.name for role in current_user.roles] if current_user.roles else []
+            # Also check is_superuser as admin role
+            if current_user.is_superuser and "admin" not in user_roles:
+                user_roles.append("admin")
+            
+            # Check if user has any of the allowed roles
+            if not any(role in allowed_roles for role in user_roles):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access forbidden: insufficient role"
                 )
             

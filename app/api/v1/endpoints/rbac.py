@@ -19,7 +19,6 @@ async def assign_role_to_user(assignment: RoleAssignment):
     )
     
     if success:
-        await casbin_enforcer.save_policy()
         return {
             "message": f"Role '{assignment.role}' assigned to user '{assignment.username}'",
             "success": True
@@ -37,7 +36,6 @@ async def revoke_role_from_user(assignment: RoleAssignment):
     )
     
     if success:
-        await casbin_enforcer.save_policy()
         return {
             "message": f"Role '{assignment.role}' revoked from user '{assignment.username}'",
             "success": True
@@ -70,9 +68,8 @@ async def assign_permission_to_role(assignment: PermissionAssignment):
     )
     
     if success:
-        await casbin_enforcer.save_policy()
         return {
-            "message": f"Permission assigned to role '{assignment.role}'",
+            "message": f"Permission '{assignment.action}' on '{assignment.resource}' assigned to role '{assignment.role}'",
             "success": True
         }
     
@@ -114,8 +111,8 @@ async def check_permission(
     resource: str,
     action: str
 ):
-    """Check if user has permission (for testing)"""
-    has_permission = casbin_enforcer.check_rbac_permission(
+    """Check if user has permission (no authentication required)"""
+    has_permission = await casbin_enforcer.check_rbac_permission_async(
         username,
         resource,
         action

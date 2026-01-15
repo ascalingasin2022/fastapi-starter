@@ -53,11 +53,18 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     """Login and get access token"""
-    # Get user by username
+    # Try username first, then email
     result = await db.execute(
         select(User).where(User.username == form_data.username)
     )
     user = result.scalar_one_or_none()
+    
+    # If username not found, try email
+    if not user:
+        result = await db.execute(
+            select(User).where(User.email == form_data.username)
+        )
+        user = result.scalar_one_or_none()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -75,14 +82,23 @@ async def login(
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
+    # Get user roles from Casbin
+    from app.core.casbin_enforcer import casbin_enforcer
+    user_roles = []
+    try:
+        user_roles = casbin_enforcer.get_roles_for_user(user.username)
+    except Exception as e:
+        print(f"Warning: Could not get roles from Casbin: {e}")
+    
     # Include user attributes in token for ABAC
     token_data = {
         "sub": user.username,
         "email": user.email,
-        "department": user.department,
-        "level": user.level,
-        "location": user.location,
-        "is_superuser": user.is_superuser
+        "department": user.department or "",
+        "level": user.level or 1,
+        "location": user.location or "",
+        "is_superuser": user.is_superuser,
+        "roles": user_roles
     }
     
     access_token = create_access_token(

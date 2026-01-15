@@ -1,7 +1,15 @@
+from enum import Enum
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Table, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base_class import Base
+
+
+class UserRole(str, Enum):
+    """User role enumeration"""
+    USER = "user"
+    ADMIN = "admin"
+    MODERATOR = "moderator"
 
 # Association table for many-to-many relationship between users and roles
 user_roles = Table(
@@ -32,6 +40,13 @@ class User(Base):
     
     # Relationships
     roles = relationship("Role", secondary=user_roles, back_populates="users")
+    
+    @property
+    def role(self) -> str:
+        """Get primary role (first role or default to USER)"""
+        if self.roles:
+            return self.roles[0].name
+        return UserRole.USER.value
 
 
 class Role(Base):

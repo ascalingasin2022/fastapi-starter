@@ -41,6 +41,15 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         raise Exception("Could not validate credentials")
 
 
+def verify_token(token: str) -> Optional[Dict[str, Any]]:
+    """Verify JWT token and return payload if valid, None otherwise"""
+    try:
+        payload = decode_access_token(token)
+        return payload
+    except Exception:
+        return None
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash"""
     return pwd_context.verify(plain_password, hashed_password)

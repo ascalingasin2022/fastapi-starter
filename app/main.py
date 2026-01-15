@@ -2,9 +2,10 @@ import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from app.core.config import settings
 from app.core.casbin_enforcer import casbin_enforcer
-from app.api.v1.endpoints import auth, rbac
+from app.api.v1.api import api_router
 from app.db.session import engine
 from app.db.base_class import Base
 
@@ -38,8 +39,41 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+    }
 )
+
+
+def custom_openapi():
+    """Custom OpenAPI schema with security definitions"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=settings.PROJECT_NAME,
+        version="1.0.0",
+        description="FastAPI project with RBAC, ABAC, and ReBAC authorization using Casbin and PostgreSQL",
+        routes=app.routes,
+    )
+    
+    # No authentication required - remove security schemes
+    # openapi_schema["components"]["securitySchemes"] = {
+    #     "HTTPBearer": {
+    #         "type": "http",
+    #         "scheme": "bearer",
+    #         "bearerFormat": "JWT",
+    #         "description": "Enter your JWT token (login at /auth/login to get a token)"
+    #     }
+    # }
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+# Set custom OpenAPI schema
+app.openapi = custom_openapi
 
 # Configure CORS
 app.add_middleware(
@@ -50,9 +84,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
-app.include_router(rbac.router, prefix=f"{settings.API_V1_STR}/rbac", tags=["RBAC Management"])
+# Include API router (includes all endpoint routers)
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
@@ -73,7 +106,7 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True
