@@ -68,7 +68,7 @@ A scalable FastAPI project template with SQLAlchemy, PostgreSQL, and best practi
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/kumarsonu676/python-fastapi-starter-api-project
+git clone https://github.com/ascalingasin2022/fastapi-starter
 cd python-fastapi-starter-api-project
 ```
 
