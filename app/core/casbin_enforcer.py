@@ -108,7 +108,7 @@ class CasbinEnforcer:
             self.abac_enforcer.load_policy()
             self.rebac_enforcer.load_policy()
             
-            print("✅ Casbin enforcers initialized with fallback method")
+            print("✅   Casbin enforcers initialized with fallback method")
             
         except Exception as e:
             print(f"❌ Fallback sync initialization failed: {e}")
