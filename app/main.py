@@ -58,15 +58,15 @@ def custom_openapi():
         routes=app.routes,
     )
     
-    # No authentication required - remove security schemes
-    # openapi_schema["components"]["securitySchemes"] = {
-    #     "HTTPBearer": {
-    #         "type": "http",
-    #         "scheme": "bearer",
-    #         "bearerFormat": "JWT",
-    #         "description": "Enter your JWT token (login at /auth/login to get a token)"
-    #     }
-    # }
+    # Add Bearer authentication (JWT) - simplifies Swagger UI to just username/password
+    # Add Basic authentication
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBasic": {
+            "type": "http",
+            "scheme": "basic",
+            "description": "Enter your username and password"
+        }
+    }
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema

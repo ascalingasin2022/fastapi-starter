@@ -7,6 +7,7 @@ from app.models.user import UserRole
 class UserBase(BaseModel):
     """Base User Schema with common attributes"""
     email: EmailStr
+    username: str
     role: Optional[str] = "USER"
     first_name: Optional[str] = Field(None, min_length=2, max_length=50, description="First name of the user")
     last_name: Optional[str] = Field(None, min_length=2, max_length=50, description="Last name of the user")

@@ -26,7 +26,9 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    full_name = Column(String)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    full_name = Column(String, nullable=True)  # Computed or for backward compatibility
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
     
@@ -36,10 +38,11 @@ class User(Base):
     location = Column(String, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_onupdate=func.now())
     
     # Relationships
     roles = relationship("Role", secondary=user_roles, back_populates="users")
+    attributes = relationship("UserAttribute", back_populates="user", cascade="all, delete-orphan")
     
     @property
     def role(self) -> str:
@@ -79,13 +82,18 @@ class Permission(Base):
 
 
 class ResourceRelationship(Base):
-    """For ReBAC - defines relationships between resources"""
+    """For ReBAC - defines relationships between subjects (users/roles) and resources"""
     __tablename__ = "resource_relationships"
 
     id = Column(Integer, primary_key=True, index=True)
-    resource_type = Column(String, nullable=False)
-    resource_id = Column(String, nullable=False)
-    parent_resource_type = Column(String, nullable=False)
-    parent_resource_id = Column(String, nullable=False)
-    relationship_type = Column(String, nullable=False)  # e.g., "owns", "member_of", "parent_of"
+    # Subject of the relationship (who/what has the relationship)
+    subject_type = Column(String, nullable=False)  # "user", "role", "resource"
+    subject_id = Column(String, nullable=False)    # username, role name, or resource identifier
+    # Target resource
+    resource_type = Column(String, nullable=False)  # e.g., "document", "project"
+    resource_id = Column(String, nullable=False)    # e.g., "doc_123", "proj_456"
+    # Relationship type
+    parent_resource_type = Column(String, nullable=False)  # parent resource type (kept for backward compatibility)
+    parent_resource_id = Column(String, nullable=False)    # parent resource id (kept for backward compatibility)
+    relationship_type = Column(String, nullable=False)     # e.g., "owner_of", "member_of", "parent_of", "manages"
     created_at = Column(DateTime(timezone=True), server_default=func.now())

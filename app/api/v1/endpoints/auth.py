@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,15 +29,23 @@ async def register(
             detail="Email already registered"
         )
     
+    # Compute full_name if not provided
+    full_name = user_in.full_name
+    if not full_name and (user_in.first_name or user_in.last_name):
+        full_name = f"{user_in.first_name or ''} {user_in.last_name or ''}".strip()
+    
     # Create new user
     user = User(
         email=user_in.email,
         username=user_in.username,
         hashed_password=get_password_hash(user_in.password),
-        full_name=user_in.full_name,
+        first_name=user_in.first_name,
+        last_name=user_in.last_name,
+        full_name=full_name,
         department=user_in.department,
         level=user_in.level,
-        location=user_in.location
+        location=user_in.location,
+        updated_at=datetime.now(timezone.utc)
     )
     
     db.add(user)

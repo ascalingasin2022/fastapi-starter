@@ -1,10 +1,9 @@
 from typing import List, Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.security import verify_token
+from app.core.security import verify_password
 from app.core.config import settings
 from app.dependencies.services import get_user_service
 from app.exceptions.http_exceptions import BadRequestError, UnauthorizedError
@@ -13,54 +12,41 @@ from app.models.user import User
 from app.db.session import get_db
 from app.services.user_service import UserService
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from app.core.security import verify_password
+
+security = HTTPBasic()
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPBasicCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get the current authenticated user from the token.    
-    
-    Args:
-        token: JWT access token
-        db: Database session
-
-    Returns:
-        Current authenticated user (User model)
-        
-    Raises:
-        HTTPException: If authentication fails
+    Get the current authenticated user using Basic Auth.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        detail="Incorrect username or password",
+        headers={"WWW-Authenticate": "Basic"},
     )
     
-    payload = verify_token(token)
-    if payload is None:
-        raise credentials_exception
+    # Try username
+    result = await db.execute(
+        select(User).where(User.username == credentials.username)
+    )
+    user = result.scalar_one_or_none()
+    
+    # If username not found, try email (optional, but good for UX)
+    if not user:
+        result = await db.execute(
+            select(User).where(User.email == credentials.username)
+        )
+        user = result.scalar_one_or_none()
 
-    # Try email first (from token payload)
-    email = payload.get("email")
-    username = payload.get("sub")  # username is typically in 'sub'
-    
-    user = None
-    if email:
-        result = await db.execute(
-            select(User).where(User.email == email)
-        )
-        user = result.scalar_one_or_none()
-    
-    # If email lookup fails, try username
-    if user is None and username:
-        result = await db.execute(
-            select(User).where(User.username == username)
-        )
-        user = result.scalar_one_or_none()
-    
-    if user is None:
+    if not user:
+        raise credentials_exception
+        
+    if not verify_password(credentials.password, user.hashed_password):
         raise credentials_exception
     
     return user

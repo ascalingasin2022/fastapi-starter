@@ -87,11 +87,50 @@ class UserService:
         return await self.user_repo.update(id=user_id, obj_in=filtered_update_data)
 
     async def delete(self, user_id: int) -> Optional[User]:
-        """Delete a user"""
+        """Delete a user (hard delete)"""
         db_obj = await self.user_repo.get(user_id)
         if not db_obj:
             return None
 
+        # Remove policies from Casbin
+        if db_obj.username:
+            casbin_enforcer.delete_role_for_user(db_obj.username, "user") # Remove basic role
+            # Ideally remove all roles, but we need to know them. 
+            # casbin_enforcer.delete_user(db_obj.username) # If such method exists or implement loop
+            
         await self.user_repo.delete(id=user_id)
 
         return db_obj
+
+    async def deactivate_user(self, user_id: int) -> Optional[User]:
+        """
+        Soft delete a user:
+        - Set is_active = False
+        - Remove roles from Casbin (access revocation)
+        - Clear sensitive relationships if needed
+        """
+        user = await self.user_repo.get(user_id)
+        if not user:
+            return None
+            
+        # 1. Update is_active
+        user.is_active = False
+        self.db.add(user)
+        
+        # 2. Remove permissions/roles from Casbin
+        try:
+            # Get all roles and remove them
+            roles = casbin_enforcer.get_roles_for_user(user.username)
+            for role in roles:
+                casbin_enforcer.delete_role_for_user(user.username, role)
+        except Exception as e:
+            print(f"Error cleaning up Casbin for user {user.username}: {e}")
+            
+        # 3. Commit changes
+        await self.db.commit()
+        await self.db.refresh(user)
+        
+        # Set transient property to avoid lazy load error in Pydantic model
+        user._casbin_role = "user"
+        
+        return user

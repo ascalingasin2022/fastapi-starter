@@ -191,6 +191,184 @@ async def setup_casbin_policies():
     print("✅ Casbin policies created")
 
 
+async def setup_abac_examples():
+    """Set up example ABAC policies and attributes"""
+    from app.models.abac import ABACPolicy, UserAttribute, ResourceAttribute
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as session:
+        # Create ABAC policies
+        policies = [
+            {
+                "name": "Engineering Read Access",
+                "description": "Engineers can read engineering documents",
+                "rules": {
+                    "conditions": [
+                        {"attribute": "department", "operator": "equals", "value": "Engineering"}
+                    ],
+                    "permissions": {"resource": "documents", "action": "read"}
+                },
+                "is_active": True
+            },
+            {
+                "name": "High Level Write Access",
+                "description": "Users with level >= 7 can write documents",
+                "rules": {
+                    "conditions": [
+                        {"attribute": "level", "operator": ">=", "value": 7}
+                    ],
+                    "permissions": {"resource": "documents", "action": "write"}
+                },
+                "is_active": True
+            },
+            {
+                "name": "HQ Delete Access",
+                "description": "Users at HQ location can delete any resource",
+                "rules": {
+                    "conditions": [
+                        {"attribute": "location", "operator": "equals", "value": "HQ"}
+                    ],
+                    "permissions": {"resource": "*", "action": "delete"}
+                },
+                "is_active": True
+            }
+        ]
+        
+        for policy_data in policies:
+            result = await session.execute(
+                select(ABACPolicy).where(ABACPolicy.name == policy_data["name"])
+            )
+            existing = result.scalar_one_or_none()
+            
+            if not existing:
+                policy = ABACPolicy(**policy_data)
+                session.add(policy)
+        
+        await session.commit()
+        
+        # Add user attributes
+        user_attributes = [
+            {"user_id": 1, "attribute_key": "clearance_level", "attribute_value": "10"},  # admin
+            {"user_id": 1, "attribute_key": "team", "attribute_value": "infrastructure"},
+            {"user_id": 2, "attribute_key": "clearance_level", "attribute_value": "7"},   # manager
+            {"user_id": 2, "attribute_key": "team", "attribute_value": "engineering-mgmt"},
+            {"user_id": 3, "attribute_key": "clearance_level", "attribute_value": "5"},   # johndoe
+            {"user_id": 3, "attribute_key": "team", "attribute_value": "backend"},
+            {"user_id": 4, "attribute_key": "clearance_level", "attribute_value": "3"},   # janesmith
+            {"user_id": 4, "attribute_key": "team", "attribute_value": "sales"},
+        ]
+        
+        for attr_data in user_attributes:
+            result = await session.execute(
+                select(UserAttribute).where(
+                    UserAttribute.user_id == attr_data["user_id"],
+                    UserAttribute.attribute_key == attr_data["attribute_key"]
+                )
+            )
+            existing = result.scalar_one_or_none()
+            
+            if not existing:
+                attribute = UserAttribute(**attr_data)
+                session.add(attribute)
+        
+        await session.commit()
+        
+        # Add resource attributes
+        resource_attributes = [
+            {"resource_type": "document", "resource_id": "doc_001", "attribute_key": "sensitivity", "attribute_value": "high"},
+            {"resource_type": "document", "resource_id": "doc_001", "attribute_key": "department", "attribute_value": "Engineering"},
+            {"resource_type": "document", "resource_id": "doc_002", "attribute_key": "sensitivity", "attribute_value": "low"},
+            {"resource_type": "document", "resource_id": "doc_002", "attribute_key": "department", "attribute_value": "Sales"},
+            {"resource_type": "project", "resource_id": "proj_001", "attribute_key": "status", "attribute_value": "active"},
+            {"resource_type": "project", "resource_id": "proj_001", "attribute_key": "department", "attribute_value": "Engineering"},
+        ]
+        
+        for attr_data in resource_attributes:
+            result = await session.execute(
+                select(ResourceAttribute).where(
+                    ResourceAttribute.resource_type == attr_data["resource_type"],
+                    ResourceAttribute.resource_id == attr_data["resource_id"],
+                    ResourceAttribute.attribute_key == attr_data["attribute_key"]
+                )
+            )
+            existing = result.scalar_one_or_none()
+            
+            if not existing:
+                attribute = ResourceAttribute(**attr_data)
+                session.add(attribute)
+        
+        await session.commit()
+        print("✅ ABAC policies and attributes created")
+
+
+async def setup_rebac_examples():
+    """Set up example ReBAC relationships"""
+    from app.models.user import ResourceRelationship
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as session:
+        relationships = [
+            # Admin owns Project 1
+            {
+                "subject_type": "user",
+                "subject_id": "admin",
+                "resource_type": "project",
+                "resource_id": "proj_001",
+                "parent_resource_type": "organization",
+                "parent_resource_id": "org_001",
+                "relationship_type": "owner_of"
+            },
+            # Project 1 contains Document 1
+            {
+                "subject_type": "resource",
+                "subject_id": "project:proj_001",
+                "resource_type": "document",
+                "resource_id": "doc_001",
+                "parent_resource_type": "project",
+                "parent_resource_id": "proj_001",
+                "relationship_type": "parent_of"
+            },
+            # Manager is member of Project 1
+            {
+                "subject_type": "user",
+                "subject_id": "manager",
+                "resource_type": "project",
+                "resource_id": "proj_001",
+                "parent_resource_type": "organization",
+                "parent_resource_id": "org_001",
+                "relationship_type": "member_of"
+            },
+            # John Doe manages Document 2
+            {
+                "subject_type": "user",
+                "subject_id": "johndoe",
+                "resource_type": "document",
+                "resource_id": "doc_002",
+                "parent_resource_type": "project",
+                "parent_resource_id": "proj_002",
+                "relationship_type": "manages"
+            }
+        ]
+        
+        for rel_data in relationships:
+            result = await session.execute(
+                select(ResourceRelationship).where(
+                    ResourceRelationship.subject_type == rel_data["subject_type"],
+                    ResourceRelationship.subject_id == rel_data["subject_id"],
+                    ResourceRelationship.resource_type == rel_data["resource_type"],
+                    ResourceRelationship.resource_id == rel_data["resource_id"]
+                )
+            )
+            existing = result.scalar_one_or_none()
+            
+            if not existing:
+                relationship = ResourceRelationship(**rel_data)
+                session.add(relationship)
+        
+        await session.commit()
+        print("✅ ReBAC relationships created")
+
+
 async def main():
     """Main seeding function"""
     print("🌱 Starting database seeding...")
@@ -200,6 +378,8 @@ async def main():
         await create_roles()
         await create_users()
         await setup_casbin_policies()
+        await setup_abac_examples()
+        await setup_rebac_examples()
         
         print("\n✅ Database seeding completed successfully!")
         print("\n📋 Created users:")
@@ -208,7 +388,17 @@ async def main():
         print("  3. john.doe@example.com / johndoe (Password: User123!) - User role")
         print("  4. jane.smith@example.com / janesmith (Password: User123!) - User role")
         print("  5. moderator@example.com / moderator (Password: Moderator123!) - Moderator role")
+        print("\n📋 ABAC Features:")
+        print("  - 3 ABAC policies created (Engineering Read, High Level Write, HQ Delete)")
+        print("  - User attributes: clearance_level, team")
+        print("  - Resource attributes: sensitivity, department, status")
+        print("\n📋 ReBAC Features:")
+        print("  - admin owns proj_001")
+        print("  - proj_001 contains doc_001 (access inherited)")
+        print("  - manager is member of proj_001")
+        print("  - johndoe manages doc_002")
         print("\n💡 You can now use these credentials to test the API!")
+        print("💡 Try the unified authorization endpoint: POST /api/v1/authorization/check")
         
     except Exception as e:
         print(f"❌ Error seeding database: {e}")

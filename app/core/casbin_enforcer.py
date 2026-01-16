@@ -177,6 +177,64 @@ class CasbinEnforcer:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.check_rebac_permission, user, resource, action)
     
+    def enforce_unified(self, user: any, resource: str, action: str, resource_obj: any = None) -> bool:
+        """
+        Unified enforcement across RBAC, ABAC, and ReBAC.
+        
+        Logic:
+        1. Check Superuser (bypass everything)
+        2. Check Self (if resource is user profile)
+        3. Check RBAC (Roles)
+        4. Check ABAC (Attributes)
+        5. Check ReBAC (Relationships)
+        
+        Returns True if ANY check passes (OR logic), or you can implement specific chain.
+        For now, we grant access if ANY model allows it (Permissive).
+        """
+        # 0. Superuser check
+        if hasattr(user, 'is_superuser') and user.is_superuser:
+            return True
+            
+        username = user.username
+        
+        # 1. Self Check (if resource is the user itself)
+        # Assuming resource format "user:{id}" or similar, OR passing resource_obj
+        if resource_obj and hasattr(resource_obj, 'username') and resource_obj.username == username:
+            # Self can read/update/delete? Let's assume yes for now, or check policy
+            # For strictness, let's say Self is allowed unless blocked, but let's use the explicit check
+            # Simple self-check:
+             if action in ["read", "update", "delete", "get"]:
+                 return True
+
+        # 2. RBAC Check
+        if self.check_rbac_permission(username, resource, action):
+            return True
+            
+        # 3. ABAC Check
+        # Convert user model to dict for attributes
+        user_attrs = {
+            "department": user.department,
+            "level": user.level,
+            "location": user.location,
+            "is_superuser": user.is_superuser,
+            "username": user.username
+        }
+        if self.check_abac_permission(user_attrs, resource, action):
+            return True
+            
+        # 4. ReBAC Check
+        # ReBAC typically checks if User is related to Resource
+        # e.g. (user1, doc1, owner)
+        if self.check_rebac_permission(username, resource, action):
+            return True
+            
+        return False
+
+    async def enforce_unified_async(self, user: any, resource: str, action: str, resource_obj: any = None) -> bool:
+        """Async wrapper for unified enforcement"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.enforce_unified, user, resource, action, resource_obj)
+
     def _build_abac_rule(self, attributes: dict) -> str:
         """Build ABAC rule from attributes"""
         conditions = []
