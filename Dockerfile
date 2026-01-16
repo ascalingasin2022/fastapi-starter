@@ -1,22 +1,28 @@
-FROM python:alpine
+FROM python:3.12-slim
 
-WORKDIR /app/
+WORKDIR /app
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+# Install system dependencies needed for some Python packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    libffi-dev \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install system dependencies and upgrade pip/setuptools
-RUN apk add --no-cache gcc musl-dev postgresql-dev \
-    && pip install --upgrade pip setuptools wheel
+# Copy requirements first for caching
+COPY requirements.txt .
 
-# Install Python dependencies
-COPY requirements.txt /app/
+# Upgrade pip and install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . /app/
+# Copy the rest of the project
+COPY . .
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expose FastAPI port
+EXPOSE 8000
+
+# Run the FastAPI app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
