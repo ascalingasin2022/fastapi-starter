@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI RBAC/ABAC/ReBAC Frontend</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>FastAPI RBAC/ABAC/ReBAC Frontend</h1>
+        <div id="auth-status">
+            <span id="token-display">Not logged in</span>
+            <button id="logout-btn" style="display: none;">Logout</button>
+        </div>
+    </header>
+
+    <nav>
+        <button class="tab-btn active" data-tab="auth">Auth</button>
+        <button class="tab-btn" data-tab="users">Users</button>
+        <button class="tab-btn" data-tab="rbac">RBAC</button>
+        <button class="tab-btn" data-tab="abac">ABAC</button>
+        <button class="tab-btn" data-tab="rebac">ReBAC</button>
+        <button class="tab-btn" data-tab="health">Health</button>
+    </nav>
+
+    <main>
+        <!-- Auth Tab -->
+        <section id="auth" class="tab-content active">
+            <h2>Authentication</h2>
+
+            <div class="grid">
+                <div class="form-container">
+                    <h3>Register New User</h3>
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="reg-username">Username</label>
+                            <input type="text" id="reg-username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email">Email</label>
+                            <input type="email" id="reg-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password">Password</label>
+                            <input type="password" id="reg-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-first-name">First Name</label>
+                            <input type="text" id="reg-first-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-last-name">Last Name</label>
+                            <input type="text" id="reg-last-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-department">Department</label>
+                            <input type="text" id="reg-department">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-level">Level</label>
+                            <input type="number" id="reg-level" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-location">Location</label>
+                            <input type="text" id="reg-location">
+                        </div>
+                        <button type="submit">Register</button>
+                    </form>
+                </div>
+
+                <div class="form-container">
+                    <h3>Login</h3>
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="login-username">Username or Email</label>
+                            <input type="text" id="login-username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" required>
+                        </div>
+                        <button type="submit">Login</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Users Tab -->
+        <section id="users" class="tab-content">
+            <h2>User Management</h2>
+
+            <div class="form-container">
+                <h3>Get All Users</h3>
+                <button id="get-users-btn">Get Users</button>
+                <div class="data-container">
+                    <div id="users-list"></div>
+                </div>
+            </div>
+
+            <div class="form-container">
+                <h3>Get User by Email</h3>
+                <div class="form-group">
+                    <label for="user-email">Email</label>
+                    <input type="email" id="user-email">
+                </div>
+                <button id="get-user-by-email-btn">Get User</button>
+                <div class="data-container">
+                    <div id="user-by-email"></div>
+                </div>
+            </div>
+
+            <div class="form-container">
+                <h3>Get User by ID</h3>
+                <input type="number" id="user-id" placeholder="User ID">
+                <button id="get-user-by-id-btn">Get User</button>
+                <div id="user-by-id"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Delete User</h3>
+                <input type="number" id="delete-user-id" placeholder="User ID">
+                <button id="delete-user-btn">Delete User</button>
+                <div id="delete-result"></div>
+            </div>
+        </section>
+
+        <!-- RBAC Tab -->
+        <section id="rbac" class="tab-content">
+            <h2>RBAC Management</h2>
+
+            <div class="form-container">
+                <h3>Assign Role to User</h3>
+                <input type="text" id="assign-username" placeholder="Username" required>
+                <input type="text" id="assign-role" placeholder="Role" required>
+                <button id="assign-role-btn">Assign Role</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Revoke Role from User</h3>
+                <input type="text" id="revoke-username" placeholder="Username" required>
+                <input type="text" id="revoke-role" placeholder="Role" required>
+                <button id="revoke-role-btn">Revoke Role</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Get User Roles</h3>
+                <input type="text" id="user-roles-username" placeholder="Username">
+                <button id="get-user-roles-btn">Get Roles</button>
+                <div id="user-roles-list"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Get Users with Role</h3>
+                <input type="text" id="role-users-role" placeholder="Role">
+                <button id="get-role-users-btn">Get Users</button>
+                <div id="role-users-list"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Assign Permission to Role</h3>
+                <input type="text" id="perm-role" placeholder="Role" required>
+                <input type="text" id="perm-resource" placeholder="Resource" required>
+                <input type="text" id="perm-action" placeholder="Action" required>
+                <button id="assign-perm-btn">Assign Permission</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Revoke Permission from Role</h3>
+                <input type="text" id="revoke-perm-role" placeholder="Role" required>
+                <input type="text" id="revoke-perm-resource" placeholder="Resource" required>
+                <input type="text" id="revoke-perm-action" placeholder="Action" required>
+                <button id="revoke-perm-btn">Revoke Permission</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Get Role Permissions</h3>
+                <input type="text" id="role-perm-role" placeholder="Role">
+                <button id="get-role-perm-btn">Get Permissions</button>
+                <div id="role-perm-list"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Check Permission</h3>
+                <input type="text" id="check-username" placeholder="Username" required>
+                <input type="text" id="check-resource" placeholder="Resource" required>
+                <input type="text" id="check-action" placeholder="Action" required>
+                <button id="check-perm-btn">Check Permission</button>
+                <div id="check-result"></div>
+            </div>
+        </section>
+
+        <!-- ABAC Tab -->
+        <section id="abac" class="tab-content">
+            <h2>ABAC Management</h2>
+
+            <div class="form-container">
+                <h3>List ABAC Policies</h3>
+                <button id="list-policies-btn">List Policies</button>
+                <div id="policies-list"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Create ABAC Policy</h3>
+                <input type="text" id="policy-name" placeholder="Policy Name" required>
+                <textarea id="policy-description" placeholder="Description"></textarea>
+                <textarea id="policy-rules" placeholder="Rules (JSON)" required></textarea>
+                <button id="create-policy-btn">Create Policy</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Set User Attribute</h3>
+                <input type="number" id="user-attr-user-id" placeholder="User ID" required>
+                <input type="text" id="user-attr-key" placeholder="Attribute Key" required>
+                <input type="text" id="user-attr-value" placeholder="Attribute Value" required>
+                <button id="set-user-attr-btn">Set Attribute</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Get User Attributes</h3>
+                <input type="number" id="get-user-attr-id" placeholder="User ID">
+                <button id="get-user-attr-btn">Get Attributes</button>
+                <div id="user-attr-list"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Check ABAC Permission</h3>
+                <input type="text" id="abac-check-username" placeholder="Username" required>
+                <input type="text" id="abac-check-resource" placeholder="Resource" required>
+                <input type="text" id="abac-check-action" placeholder="Action" required>
+                <input type="text" id="abac-resource-type" placeholder="Resource Type">
+                <input type="text" id="abac-resource-id" placeholder="Resource ID">
+                <button id="check-abac-btn">Check Permission</button>
+                <div id="abac-check-result"></div>
+            </div>
+        </section>
+
+        <!-- ReBAC Tab -->
+        <section id="rebac" class="tab-content">
+            <h2>ReBAC Management</h2>
+
+            <div class="form-container">
+                <h3>List Relationships</h3>
+                <button id="list-relationships-btn">List Relationships</button>
+                <div id="relationships-list"></div>
+            </div>
+
+            <div class="form-container">
+                <h3>Create Relationship</h3>
+                <input type="text" id="rel-subject-type" placeholder="Subject Type" required>
+                <input type="text" id="rel-subject-id" placeholder="Subject ID" required>
+                <input type="text" id="rel-resource-type" placeholder="Resource Type" required>
+                <input type="text" id="rel-resource-id" placeholder="Resource ID" required>
+                <input type="text" id="rel-parent-type" placeholder="Parent Resource Type">
+                <input type="text" id="rel-parent-id" placeholder="Parent Resource ID">
+                <input type="text" id="rel-type" placeholder="Relationship Type" required>
+                <button id="create-rel-btn">Create Relationship</button>
+            </div>
+
+            <div class="form-container">
+                <h3>Check ReBAC Permission</h3>
+                <input type="text" id="rebac-check-username" placeholder="Username" required>
+                <input type="text" id="rebac-check-resource" placeholder="Resource" required>
+                <input type="text" id="rebac-check-action" placeholder="Action" required>
+                <button id="check-rebac-btn">Check Permission</button>
+                <div id="rebac-check-result"></div>
+            </div>
+        </section>
+
+        <!-- Health Tab -->
+        <section id="health" class="tab-content">
+            <h2>Health Check</h2>
+            <button id="health-check-btn">Check Health</button>
+            <div id="health-status"></div>
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
