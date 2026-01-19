@@ -512,3 +512,104 @@ const response = await auth.authenticatedFetch('/users/me');
 const user = await response.json();
 console.log(user);
 ```
+
+## Using ReBAC (Relationship-Based Access Control)
+
+ReBAC (Relationship-Based Access Control) allows you to define relationships between users, roles, and resources to control access based on these relationships. This is useful for hierarchical or organizational structures.
+
+### Understanding ReBAC Relationships
+
+A ReBAC relationship consists of:
+- **Subject**: Who has the relationship (user, role, or resource)
+- **Resource**: The target resource
+- **Parent Resource**: Hierarchical context (optional)
+- **Relationship Type**: The type of relationship (e.g., "owner_of", "member_of", "manages")
+
+### Creating Relationships
+
+To create a relationship (admin only):
+
+```bash
+TOKEN="your-admin-token-here"
+
+curl -X POST "http://localhost:8000/api/v1/rebac/relationships" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject_type": "user",
+    "subject_id": "admin",
+    "resource_type": "document",
+    "resource_id": "doc1",
+    "parent_resource_type": "folder",
+    "parent_resource_id": "folder1",
+    "relationship_type": "owner_of"
+  }'
+```
+
+Response:
+```json
+{
+  "id": 1,
+  "subject_type": "user",
+  "subject_id": "admin",
+  "resource_type": "document",
+  "resource_id": "doc1",
+  "parent_resource_type": "folder",
+  "parent_resource_id": "folder1",
+  "relationship_type": "owner_of"
+}
+```
+
+### Checking ReBAC Permissions
+
+Check if a user has permission based on relationships:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/rebac/check" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "resource": "document:doc1",
+    "action": "read"
+  }'
+```
+
+Response:
+```json
+{
+  "username": "admin",
+  "resource": "document:doc1",
+  "action": "read",
+  "has_permission": true,
+  "relationship_path": ["user:admin -> owner_of -> document:doc1"],
+  "reason": "Access granted via relationship chain"
+}
+```
+
+### Listing Relationships
+
+List all relationships (admin only):
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/rebac/relationships" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Getting Resource Relationships
+
+Get relationships for a specific resource:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/rebac/relationships/resource/document/doc1" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Deleting Relationships
+
+Delete a relationship by ID (admin only):
+
+```bash
+curl -X DELETE "http://localhost:8000/api/v1/rebac/relationships/1" \
+  -H "Authorization: Bearer $TOKEN"
+```
