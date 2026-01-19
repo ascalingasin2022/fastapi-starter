@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -14,20 +14,22 @@ router = APIRouter()
     summary="Health check endpoint",
     description="Simple health check endpoint to verify the API is running",
 )
-def health_check(db: Session = Depends(get_db)):
+def health_check(request: Request, db: Session = Depends(get_db)):
     """
     Health check endpoint.
-    
+
     This endpoint checks the health of the service and its dependencies.
     It verifies database connectivity and returns status information.
-    
+
     Args:
+        request: FastAPI request object
         db: Database session dependency
-        
+
     Returns:
         Success response with health status
     """
-    log_error("Health check performed")
+    origin = request.headers.get('origin', 'No origin')
+    log_error(f"Health check performed from origin: {origin}")
     
     # Try to connect to the database
     try:

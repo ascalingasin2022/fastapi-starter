@@ -1,6 +1,6 @@
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from app.core.config import settings
@@ -99,8 +99,10 @@ async def root():
 
 
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
     """Health check endpoint"""
+    origin = request.headers.get('origin', 'No origin')
+    print(f"Root health check from origin: {origin}")
     return {"status": "healthy"}
 
 
