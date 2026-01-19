@@ -12,42 +12,59 @@ from app.models.user import User
 from app.db.session import get_db
 from app.services.user_service import UserService
 
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from app.core.security import verify_password
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
+from app.core.security import verify_password, decode_access_token
 
-security = HTTPBasic()
+security_basic = HTTPBasic(auto_error=False)
+security_bearer = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 async def get_current_user(
-    credentials: HTTPBasicCredentials = Depends(security),
+    basic_credentials: Optional[HTTPBasicCredentials] = Depends(security_basic),
+    bearer_token: Optional[str] = Depends(security_bearer),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get the current authenticated user using Basic Auth.
+    Get the current authenticated user using JWT or Basic Auth.
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Incorrect username or password",
-        headers={"WWW-Authenticate": "Basic"},
-    )
+    user = None
     
-    # Try username
-    result = await db.execute(
-        select(User).where(User.username == credentials.username)
-    )
-    user = result.scalar_one_or_none()
-    
-    # If username not found, try email (optional, but good for UX)
-    if not user:
+    # 1. Try JWT (Bearer) first - primary for frontend
+    if bearer_token:
+        try:
+            payload = decode_access_token(bearer_token)
+            username = payload.get("sub")
+            if username:
+                result = await db.execute(
+                    select(User).where(User.username == username)
+                )
+                user = result.scalar_one_or_none()
+        except Exception:
+            pass # Fall through to Basic Auth
+            
+    # 2. Try Basic Auth - for Swagger UI simplify
+    if not user and basic_credentials:
+        # Try username
         result = await db.execute(
-            select(User).where(User.email == credentials.username)
+            select(User).where(User.username == basic_credentials.username)
         )
         user = result.scalar_one_or_none()
+        
+        # If username not found, try email
+        if not user:
+            result = await db.execute(
+                select(User).where(User.email == basic_credentials.username)
+            )
+            user = result.scalar_one_or_none()
+
+        if user and not verify_password(basic_credentials.password, user.hashed_password):
+            user = None
 
     if not user:
-        raise credentials_exception
-        
-    if not verify_password(credentials.password, user.hashed_password):
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer, Basic"},
+        )
     
     return user
 
