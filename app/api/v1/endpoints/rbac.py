@@ -5,7 +5,9 @@ from app.schemas.rbac import (
     RoleAssignment,
     PermissionAssignment,
     RoleResponse,
-    PermissionResponse
+    PermissionResponse,
+    RBACCheckRequest,
+    RBACCheckResponse
 )
 
 router = APIRouter()
@@ -127,22 +129,20 @@ async def get_role_permissions(role: str):
     }
 
 
-@router.post("/check-permission")
+@router.post("/check-permission", response_model=RBACCheckResponse)
 async def check_permission(
-    username: str,
-    resource: str,
-    action: str
+    check_request: RBACCheckRequest
 ):
     """Check if user has permission (no authentication required)"""
     has_permission = await casbin_enforcer.check_rbac_permission_async(
-        username,
-        resource,
-        action
+        check_request.username,
+        check_request.resource,
+        check_request.action
     )
-    
-    return {
-        "username": username,
-        "resource": resource,
-        "action": action,
-        "has_permission": has_permission
-    }
+
+    return RBACCheckResponse(
+        username=check_request.username,
+        resource=check_request.resource,
+        action=check_request.action,
+        has_permission=has_permission
+    )

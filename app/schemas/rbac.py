@@ -62,6 +62,21 @@ class REBACCheckRequest(BaseModel):
     action: str
 
 
+class RBACCheckRequest(BaseModel):
+    """Schema for checking RBAC permission"""
+    username: str
+    resource: str
+    action: str
+
+
+class RBACCheckResponse(BaseModel):
+    """Schema for RBAC permission check response"""
+    username: str
+    resource: str
+    action: str
+    has_permission: bool
+
+
 class REBACCheckResponse(BaseModel):
     """Schema for ReBAC permission check response"""
     username: str
