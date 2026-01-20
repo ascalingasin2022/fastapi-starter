@@ -16,39 +16,26 @@ Complete implementation of Role-Based Access Control (RBAC), Attribute-Based Acc
 
 ## 📁 Project Structure
 
+## 📁 Project Structure
+
 ```
 .
-├── app/
-│   ├── api/v1/endpoints/
-│   │   ├── auth.py           # Authentication endpoints
-│   │   └── rbac.py           # RBAC management endpoints
-│   ├── casbin/
-│   │   ├── rbac_model.conf   # RBAC model configuration
-│   │   ├── abac_model.conf   # ABAC model configuration
-│   │   ├── rebac_model.conf  # ReBAC model configuration
-│   │   └── rbac_policy.csv   # Initial RBAC policies
-│   ├── core/
-│   │   ├── config.py         # Application configuration
-│   │   ├── security.py       # Security utilities
-│   │   └── casbin_enforcer.py # Casbin enforcer setup
-│   ├── db/
-│   │   ├── base_class.py     # SQLAlchemy base
-│   │   └── session.py        # Database session
-│   ├── middlewares/
-│   │   └── auth_middleware.py # Authorization middleware
-│   ├── models/
-│   │   └── user.py           # User, Role, Permission models
-│   └── schemas/
-│       ├── auth.py           # Authentication schemas
-│       └── rbac.py           # RBAC schemas
-├── alembic/
-│   └── versions/
-│       └── 001_initial_migration.py
-├── docker-compose.yml
-├── Dockerfile
-├── main.py
-├── requirements.txt
-└── .env.example
+├── backend/          # FastAPI Backend
+│   ├── app/          # Application code
+│   │   ├── api/      # API endpoints
+│   │   ├── core/     # Config & Security
+│   │   ├── models/   # Database models
+│   │   └── ...
+│   ├── alembic/      # Database migrations
+│   ├── main.py       # Entry point
+│   ├── Dockerfile
+│   └── docker-compose.yml
+│
+├── frontend/         # Frontend
+│   ├── package.json
+│   └── src/          # Static assets (HTML/CSS/JS)
+│
+└── README.md
 ```
 
 ## 🚀 Quick Start
@@ -58,7 +45,7 @@ Complete implementation of Role-Based Access Control (RBAC), Attribute-Based Acc
 ```bash
 # Clone the repository
 git clone https://github.com/ascalingasin2022/fastapi-starter
-cd fastapi-starter
+cd fastapi-starter/backend
 
 # Run setup script
 chmod +x scripts/setup.sh

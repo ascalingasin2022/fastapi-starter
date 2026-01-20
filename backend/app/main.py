@@ -1,6 +1,8 @@
 import uvicorn
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from app.core.config import settings
@@ -85,17 +87,28 @@ app.add_middleware(
 )
 
 # Include API router (includes all endpoint routers)
+# Include API router (includes all endpoint routers)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+# Mount frontend static files
+# Construct path to frontend/src relative to this file
+# backend/app/main.py -> backend/app -> backend -> root -> frontend/src
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "src")
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "Welcome to FastAPI RBAC/ABAC/ReBAC API",
-        "docs": f"{settings.API_V1_STR}/docs",
-        "version": "1.0.0"
-    }
+if os.path.isdir(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+else:
+    print(f"⚠️ Frontend directory not found at {frontend_path}")
+
+# Root endpoint replaced by StaticFiles
+# @app.get("/")
+# async def root():
+#     """Root endpoint"""
+#     return {
+#         "message": "Welcome to FastAPI RBAC/ABAC/ReBAC API",
+#         "docs": f"{settings.API_V1_STR}/docs",
+#         "version": "1.0.0"
+#     }
 
 
 @app.get("/health")
