@@ -88,6 +88,26 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 
+async def get_current_superuser(current_user: User = Depends(get_current_active_user)):
+    """
+    Get the current superuser (admin).
+    Args:
+        current_user: Current authenticated user (User model)
+    Returns:
+        Current superuser (User model)
+    Raises:
+        HTTPException: If the user is not a superuser
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: admin privileges required"
+        )
+    
+    return current_user
+
+
+
 
 # Usage example:
 

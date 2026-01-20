@@ -7,6 +7,9 @@ from app.api.v1.endpoints import rbac
 from app.api.v1.endpoints import abac
 from app.api.v1.endpoints import rebac
 from app.api.v1.endpoints import authorization
+from app.api.v1.endpoints import banks
+from app.api.v1.endpoints import templates
+from app.api.v1.endpoints import submissions
 
 api_router = APIRouter()
 
@@ -17,5 +20,8 @@ api_router.include_router(rbac.router, prefix="/rbac", tags=["RBAC Management"])
 api_router.include_router(abac.router, prefix="/abac", tags=["ABAC Management"])
 api_router.include_router(rebac.router, prefix="/rebac", tags=["ReBAC Management"])
 api_router.include_router(authorization.router, prefix="/authorization", tags=["Unified Authorization"])
+api_router.include_router(banks.router, prefix="/banks", tags=["Form System - Banks"])
+api_router.include_router(templates.router, prefix="/templates", tags=["Form System - Templates"])
+api_router.include_router(submissions.router, prefix="/submissions", tags=["Form System - Submissions"])
 
 # This is the main API router that includes all endpoint routers

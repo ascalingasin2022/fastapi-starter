@@ -1,4 +1,9 @@
-const API_BASE = 'http://localhost:8000/api/v1';
+// Configuration
+const CONFIG = {
+    API_BASE: 'http://127.0.0.1:8080/api/v1',
+    TIMEOUT: 30000, // 30 seconds
+    RETRY_ATTEMPTS: 1
+};
 
 // Utility functions
 function getToken() {
@@ -46,6 +51,7 @@ function updateAuthStatus() {
     }
 }
 
+// Enhanced API request with timeout and better error handling
 async function apiRequest(url, options = {}) {
     const token = getToken();
     const headers = {
@@ -57,21 +63,73 @@ async function apiRequest(url, options = {}) {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+
     try {
         const response = await fetch(url, {
             ...options,
-            headers
+            headers,
+            signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
+
+        // Handle different response statuses
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`HTTP ${response.status}: ${error}`);
+            let errorMessage;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}`;
+            } catch {
+                errorMessage = await response.text() || `HTTP ${response.status}`;
+            }
+
+            // Handle specific status codes
+            if (response.status === 401) {
+                clearToken();
+                throw new Error('Authentication required. Please log in again.');
+            } else if (response.status === 403) {
+                throw new Error('Access denied. You do not have permission for this action.');
+            } else if (response.status === 404) {
+                throw new Error('Resource not found.');
+            } else if (response.status >= 500) {
+                throw new Error(`Server error: ${errorMessage}`);
+            } else {
+                throw new Error(errorMessage);
+            }
         }
 
-        return await response.json();
+        // Handle empty responses
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        } else {
+            return { success: true };
+        }
     } catch (error) {
-        console.error('API request failed:', error);
-        throw error;
+        clearTimeout(timeoutId);
+
+        // Handle network errors
+        if (error.name === 'AbortError') {
+            throw new Error('Request timeout. Please check your connection and try again.');
+        } else if (error instanceof TypeError && error.message.includes('fetch')) {
+            throw new Error('Network error. Unable to connect to server. Please ensure the backend is running.');
+        } else {
+            throw error;
+        }
+    }
+}
+
+// Button state management helper
+function setButtonLoading(button, loading) {
+    if (loading) {
+        button.disabled = true;
+        button.dataset.originalText = button.textContent;
+        button.textContent = 'Loading...';
+    } else {
+        button.disabled = false;
+        button.textContent = button.dataset.originalText || button.textContent;
     }
 }
 
@@ -104,7 +162,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     };
 
     try {
-        const result = await apiRequest(`${API_BASE}/auth/register`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/auth/register`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -122,7 +180,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     formData.append('password', document.getElementById('login-password').value);
 
     try {
-        const result = await fetch(`${API_BASE}/auth/login`, {
+        const result = await fetch(`${CONFIG.API_BASE}/auth/login`, {
             method: 'POST',
             body: formData
         });
@@ -141,8 +199,10 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
 // Users functions
 document.getElementById('get-users-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('get-users-btn');
+    setButtonLoading(btn, true);
     try {
-        const result = await apiRequest(`${API_BASE}/users/`);
+        const result = await apiRequest(`${CONFIG.API_BASE}/users/`);
         const users = result.data || [];
         const container = document.getElementById('users-list');
         if (users.length === 0) {
@@ -186,13 +246,15 @@ document.getElementById('get-users-btn').addEventListener('click', async () => {
         container.innerHTML = tableHtml;
     } catch (error) {
         document.getElementById('users-list').innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+    } finally {
+        setButtonLoading(btn, false);
     }
 });
 
 document.getElementById('get-user-by-email-btn').addEventListener('click', async () => {
     const email = document.getElementById('user-email').value;
     try {
-        const result = await apiRequest(`${API_BASE}/users/by-email?email=${encodeURIComponent(email)}`);
+        const result = await apiRequest(`${CONFIG.API_BASE}/users/by-email?email=${encodeURIComponent(email)}`);
         const user = result.data;
         const container = document.getElementById('user-by-email');
 
@@ -239,7 +301,7 @@ document.getElementById('get-user-by-email-btn').addEventListener('click', async
 document.getElementById('get-user-by-id-btn').addEventListener('click', async () => {
     const id = document.getElementById('user-id').value;
     try {
-        const result = await apiRequest(`${API_BASE}/users/${id}`);
+        const result = await apiRequest(`${CONFIG.API_BASE}/users/${id}`);
         const user = result.data;
         const container = document.getElementById('user-by-id');
 
@@ -286,7 +348,7 @@ document.getElementById('get-user-by-id-btn').addEventListener('click', async ()
 document.getElementById('delete-user-btn').addEventListener('click', async () => {
     const id = document.getElementById('delete-user-id').value;
     try {
-        const result = await apiRequest(`${API_BASE}/users/${id}`, { method: 'DELETE' });
+        const result = await apiRequest(`${CONFIG.API_BASE}/users/${id}`, { method: 'DELETE' });
         document.getElementById('delete-result').innerHTML = '<pre>' + JSON.stringify(result.data, null, 2) + '</pre>';
     } catch (error) {
         document.getElementById('delete-result').textContent = 'Error: ' + error.message;
@@ -300,7 +362,7 @@ document.getElementById('assign-role-btn').addEventListener('click', async () =>
         role: document.getElementById('assign-role').value
     };
     try {
-        const result = await apiRequest(`${API_BASE}/rbac/roles/assign`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rbac/roles/assign`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -316,7 +378,7 @@ document.getElementById('revoke-role-btn').addEventListener('click', async () =>
         role: document.getElementById('revoke-role').value
     };
     try {
-        const result = await apiRequest(`${API_BASE}/rbac/roles/revoke`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rbac/roles/revoke`, {
             method: 'DELETE',
             body: JSON.stringify(data)
         });
@@ -329,7 +391,7 @@ document.getElementById('revoke-role-btn').addEventListener('click', async () =>
 document.getElementById('get-user-roles-btn').addEventListener('click', async () => {
     const username = document.getElementById('user-roles-username').value;
     try {
-        const roles = await apiRequest(`${API_BASE}/rbac/roles/user/${username}`);
+        const roles = await apiRequest(`${CONFIG.API_BASE}/rbac/roles/user/${username}`);
         const container = document.getElementById('user-roles-list');
 
         if (roles.length === 0) {
@@ -361,7 +423,7 @@ document.getElementById('get-user-roles-btn').addEventListener('click', async ()
 document.getElementById('get-role-users-btn').addEventListener('click', async () => {
     const role = document.getElementById('role-users-role').value;
     try {
-        const users = await apiRequest(`${API_BASE}/rbac/roles/${role}/users`);
+        const users = await apiRequest(`${CONFIG.API_BASE}/rbac/roles/${role}/users`);
         const container = document.getElementById('role-users-list');
 
         if (users.length === 0) {
@@ -397,7 +459,7 @@ document.getElementById('assign-perm-btn').addEventListener('click', async () =>
         action: document.getElementById('perm-action').value
     };
     try {
-        const result = await apiRequest(`${API_BASE}/rbac/permissions/assign`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rbac/permissions/assign`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -414,7 +476,7 @@ document.getElementById('revoke-perm-btn').addEventListener('click', async () =>
         action: document.getElementById('revoke-perm-action').value
     };
     try {
-        const result = await apiRequest(`${API_BASE}/rbac/permissions/revoke`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rbac/permissions/revoke`, {
             method: 'DELETE',
             body: JSON.stringify(data)
         });
@@ -427,7 +489,7 @@ document.getElementById('revoke-perm-btn').addEventListener('click', async () =>
 document.getElementById('get-role-perm-btn').addEventListener('click', async () => {
     const role = document.getElementById('role-perm-role').value;
     try {
-        const result = await apiRequest(`${API_BASE}/rbac/permissions/role/${role}`);
+        const result = await apiRequest(`${CONFIG.API_BASE}/rbac/permissions/role/${role}`);
         const permissions = result.permissions || [];
         const container = document.getElementById('role-perm-list');
 
@@ -472,7 +534,7 @@ document.getElementById('check-perm-btn').addEventListener('click', async () => 
         action: document.getElementById('check-action').value
     };
     try {
-        const result = await apiRequest(`${API_BASE}/rbac/check-permission`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rbac/check-permission`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -507,7 +569,7 @@ document.getElementById('check-perm-btn').addEventListener('click', async () => 
 // ABAC functions
 document.getElementById('list-policies-btn').addEventListener('click', async () => {
     try {
-        const policies = await apiRequest(`${API_BASE}/abac/policies`);
+        const policies = await apiRequest(`${CONFIG.API_BASE}/abac/policies`);
         const container = document.getElementById('policies-list');
 
         if (policies.length === 0) {
@@ -563,7 +625,7 @@ document.getElementById('create-policy-btn').addEventListener('click', async () 
     };
 
     try {
-        const result = await apiRequest(`${API_BASE}/abac/policies`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/abac/policies`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -582,7 +644,7 @@ document.getElementById('set-user-attr-btn').addEventListener('click', async () 
     };
 
     try {
-        const result = await apiRequest(`${API_BASE}/abac/attributes/user`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/abac/attributes/user`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -596,7 +658,7 @@ document.getElementById('set-user-attr-btn').addEventListener('click', async () 
 document.getElementById('get-user-attr-btn').addEventListener('click', async () => {
     const userId = document.getElementById('get-user-attr-id').value;
     try {
-        const attributes = await apiRequest(`${API_BASE}/abac/attributes/user/${userId}`);
+        const attributes = await apiRequest(`${CONFIG.API_BASE}/abac/attributes/user/${userId}`);
         const container = document.getElementById('user-attr-list');
 
         if (attributes.length === 0) {
@@ -641,7 +703,7 @@ document.getElementById('check-abac-btn').addEventListener('click', async () => 
     };
 
     try {
-        const result = await apiRequest(`${API_BASE}/abac/check`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/abac/check`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -684,7 +746,7 @@ document.getElementById('check-abac-btn').addEventListener('click', async () => 
 // ReBAC functions
 document.getElementById('list-relationships-btn').addEventListener('click', async () => {
     try {
-        const relationships = await apiRequest(`${API_BASE}/rebac/relationships`);
+        const relationships = await apiRequest(`${CONFIG.API_BASE}/rebac/relationships`);
         const container = document.getElementById('relationships-list');
 
         if (relationships.length === 0) {
@@ -739,7 +801,7 @@ document.getElementById('create-rel-btn').addEventListener('click', async () => 
     };
 
     try {
-        const result = await apiRequest(`${API_BASE}/rebac/relationships`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rebac/relationships`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -758,7 +820,7 @@ document.getElementById('check-rebac-btn').addEventListener('click', async () =>
     };
 
     try {
-        const result = await apiRequest(`${API_BASE}/rebac/check`, {
+        const result = await apiRequest(`${CONFIG.API_BASE}/rebac/check`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -800,33 +862,63 @@ document.getElementById('check-rebac-btn').addEventListener('click', async () =>
 
 // Health function
 document.getElementById('health-check-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('health-check-btn');
+    const container = document.getElementById('health-status');
+
+    setButtonLoading(btn, true);
+    container.innerHTML = '<p>Checking backend health...</p>';
+
     try {
-        const result = await apiRequest(`${API_BASE}/health/`);
-        const container = document.getElementById('health-status');
+        // Health endpoint is at root /health, not under /api/v1
+        const response = await fetch('http://localhost:8000/health', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend returned status ${response.status}`);
+        }
+
+        const result = await response.json();
+
         container.innerHTML = `
             <table>
                 <tbody>
                     <tr>
                         <td><strong>Status:</strong></td>
-                        <td><span class="status-success">${result.data.status}</span></td>
+                        <td><span class="status-success">✅ ${result.status || 'healthy'}</span></td>
                     </tr>
                     <tr>
-                        <td><strong>Message:</strong></td>
-                        <td>${result.data.message}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Database:</strong></td>
-                        <td><span class="status-${result.data.database === 'connected' ? 'success' : 'error'}">${result.data.database}</span></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Version:</strong></td>
-                        <td>${result.data.version}</td>
+                        <td><strong>Backend:</strong></td>
+                        <td><span class="status-success">Connected</span></td>
                     </tr>
                 </tbody>
             </table>
         `;
     } catch (error) {
-        document.getElementById('health-status').innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+        console.error('Health check failed:', error);
+        container.innerHTML = `
+            <table>
+                <tbody>
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td><span class="status-error">❌ Unhealthy</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Error:</strong></td>
+                        <td>${error.message}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Suggestion:</strong></td>
+                        <td>Ensure the FastAPI backend is running on http://localhost:8000</td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+    } finally {
+        setButtonLoading(btn, false);
     }
 });
 
